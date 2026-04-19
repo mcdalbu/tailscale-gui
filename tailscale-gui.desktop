@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Tailscale GUI
+Comment=Gerenciador de rede privada Tailscale
+Exec=tailscale-gui
+Icon=tailscale-gui
+Terminal=false
+Type=Application
+Categories=Network;System;
+Keywords=tailscale;vpn;rede;privada;mesh;
+StartupNotify=true
+StartupWMClass=tailscale-gui

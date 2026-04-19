@@ -1,0 +1,12 @@
+# Build artifacts
+*.rpm
+rpmbuild/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor
+.vscode/
+*.swp
