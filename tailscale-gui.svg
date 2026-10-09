@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Tailscale GUI — rede privada</title>
+  <desc>Três dispositivos conectados em uma rede azul, com um escudo verde de proteção.</desc>
+  <defs>
+    <linearGradient id="tile" x1="32" y1="20" x2="218" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#285680"/>
+      <stop offset=".52" stop-color="#173a61"/>
+      <stop offset="1" stop-color="#10233e"/>
+    </linearGradient>
+    <linearGradient id="wire" x1="74" y1="76" x2="170" y2="178" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9ae9ff"/>
+      <stop offset="1" stop-color="#6bd8bb"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="165" y1="148" x2="204" y2="219" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#85f0c5"/>
+      <stop offset="1" stop-color="#35b98e"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="22" width="224" height="224" rx="54" fill="#09182c" opacity=".18"/>
+  <rect x="16" y="14" width="224" height="224" rx="54" fill="url(#tile)"/>
+  <rect x="17" y="15" width="222" height="222" rx="53" fill="none" stroke="#93d9ff" stroke-opacity=".16" stroke-width="2"/>
+  <path d="M73 78 176 88 107 175Z" fill="none" stroke="#0c223d" stroke-width="17" stroke-linejoin="round" transform="translate(0 4)"/>
+  <path d="M73 78 176 88 107 175Z" fill="none" stroke="url(#wire)" stroke-width="11" stroke-linejoin="round"/>
+  <g fill="#0a213a" opacity=".45" transform="translate(0 5)">
+    <circle cx="73" cy="78" r="24"/><circle cx="176" cy="88" r="24"/><circle cx="107" cy="175" r="24"/>
+  </g>
+  <g fill="#edfaff">
+    <circle cx="73" cy="78" r="24"/><circle cx="176" cy="88" r="24"/><circle cx="107" cy="175" r="24"/>
+  </g>
+  <circle cx="73" cy="78" r="11" fill="#4fa4d8"/>
+  <circle cx="176" cy="88" r="11" fill="#4fa4d8"/>
+  <circle cx="107" cy="175" r="11" fill="#36b897"/>
+  <path d="M184 143 216 155V179C216 198 201 212 184 220 167 212 152 198 152 179V155Z" fill="#102b46" stroke="#102b46" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M184 143 216 155V179C216 198 201 212 184 220 167 212 152 198 152 179V155Z" fill="url(#shield)"/>
+  <path d="m169 180 10 10 20-24" fill="none" stroke="#123c43" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

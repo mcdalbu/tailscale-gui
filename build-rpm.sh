@@ -1,41 +1,44 @@
 #!/usr/bin/env bash
 # build-rpm.sh — Empacota o tailscale-gui como .rpm
-set -e
+set -euo pipefail
 
 NAME="tailscale-gui"
-VERSION="1.0.0"
 SRCDIR="$(cd "$(dirname "$0")" && pwd)"
-BUILDDIR="/tmp/rpmbuild-$NAME"
+VERSION=$(awk '/^Version:/ {print $2}' "$SRCDIR/$NAME.spec")
+command -v rpmbuild >/dev/null || { echo "Instale rpm-build para gerar o RPM." >&2; exit 1; }
+TASK_BUILDDIR=$(mktemp -d "/tmp/rpmbuild-$NAME.XXXXXX")
+TASK_SOURCE_DIR=$(mktemp -d "/tmp/source-$NAME.XXXXXX")
+trap 'rm -rf "$TASK_BUILDDIR" "$TASK_SOURCE_DIR"' EXIT
 
 echo "==> Criando estrutura rpmbuild..."
-rm -rf "$BUILDDIR"
-mkdir -p "$BUILDDIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+mkdir -p "$TASK_BUILDDIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS,tmp}
 
 echo "==> Criando tarball do código-fonte..."
-TMPDIR=$(mktemp -d)
-mkdir -p "$TMPDIR/$NAME-$VERSION"
-cp "$SRCDIR/tailscale-gui.py"      "$TMPDIR/$NAME-$VERSION/"
-cp "$SRCDIR/tailscale-gui.desktop" "$TMPDIR/$NAME-$VERSION/"
-cp "$SRCDIR/tailscale-gui.png"     "$TMPDIR/$NAME-$VERSION/"
+mkdir -p "$TASK_SOURCE_DIR/$NAME-$VERSION"
+cp "$SRCDIR/tailscale-gui.py" "$SRCDIR/tailscale-gui.desktop" \
+   "$SRCDIR/tailscale-gui.png" "$SRCDIR/tailscale-gui.svg" \
+   "$SRCDIR/README.md" "$TASK_SOURCE_DIR/$NAME-$VERSION/"
+mkdir -p "$TASK_SOURCE_DIR/$NAME-$VERSION/tests"
+cp "$SRCDIR"/tests/*.py "$TASK_SOURCE_DIR/$NAME-$VERSION/tests/"
 
-tar -czf "$BUILDDIR/SOURCES/$NAME-$VERSION.tar.gz" \
-    -C "$TMPDIR" "$NAME-$VERSION"
-rm -rf "$TMPDIR"
+tar -czf "$TASK_BUILDDIR/SOURCES/$NAME-$VERSION.tar.gz" \
+    -C "$TASK_SOURCE_DIR" "$NAME-$VERSION"
 
 echo "==> Copiando spec..."
-cp "$SRCDIR/tailscale-gui.spec" "$BUILDDIR/SPECS/"
+cp "$SRCDIR/tailscale-gui.spec" "$TASK_BUILDDIR/SPECS/"
 
 echo "==> Buildando RPM..."
 rpmbuild \
-    --define "_topdir $BUILDDIR" \
-    -ba "$BUILDDIR/SPECS/$NAME.spec"
+    --define "_topdir $TASK_BUILDDIR" \
+    --define "_tmppath $TASK_BUILDDIR/tmp" \
+    -ba "$TASK_BUILDDIR/SPECS/$NAME.spec"
 
 echo ""
 echo "==> RPM gerado:"
-find "$BUILDDIR/RPMS" -name "*.rpm" | tee /dev/stderr
+find "$TASK_BUILDDIR/RPMS" -name "*.rpm"
 
 # Copiar o RPM para o diretório do projeto
-find "$BUILDDIR/RPMS" -name "*.rpm" -exec cp {} "$SRCDIR/" \;
+find "$TASK_BUILDDIR/RPMS" -name "*.rpm" -exec cp {} "$SRCDIR/" \;
 echo ""
 echo "==> Copiado para: $SRCDIR"
 echo "==> Para instalar:  sudo dnf install ./$NAME-$VERSION-*.rpm"
