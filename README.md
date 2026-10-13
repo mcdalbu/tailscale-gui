@@ -31,7 +31,7 @@ Interface gráfica nativa **GTK4 / libadwaita** para controlar o [Tailscale](htt
 Baixe o `.rpm` na [página de releases](../../releases) e instale com:
 
 ```bash
-sudo dnf install ./tailscale-gui-1.2.0-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
 ```
 
 ## Build manual
@@ -46,7 +46,7 @@ cd tailscale-gui
 bash build-rpm.sh
 
 # Instalar
-sudo dnf install ./tailscale-gui-1.2.0-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
 ```
 
 ## Executar sem instalar
@@ -64,6 +64,8 @@ As opções são lidas de `tailscale debug prefs`. Se essa consulta falhar, o ap
 Em **Configurações → Comportamento do aplicativo**, habilite **Minimizar para o tray ao fechar**. A opção começa desativada e é salva em `~/.config/tailscale-gui/settings.json` (ou no diretório definido por `XDG_CONFIG_HOME`). Quando ativada, fechar a janela mantém o aplicativo e a atualização do status funcionando. Clique no ícone para reabrir a janela ou use **Sair** no menu do tray ou do app; `Ctrl+Q` também encerra o aplicativo.
 
 A integração usa StatusNotifierItem e DBusMenu, sem adicionar dependências GTK3. No KDE Plasma, o suporte já faz parte do painel. No GNOME, é necessário suporte a AppIndicator/KStatusNotifierItem, como a extensão **AppIndicator and KStatusNotifierItem Support**. A opção fica indisponível se não houver um host de tray ativo. Nesse caso, fechar encerra o app normalmente; se o suporte ao tray desaparecer enquanto a janela estiver oculta, ela será reaberta automaticamente.
+
+O estado da conexão continua sendo consultado a cada 5 segundos com a janela oculta. A versão 1.2.1 corrige a atualização do rótulo do menu e do tooltip para que hosts que mantêm o menu em cache, como o GNOME, acompanhem as transições entre conectado e desconectado. Depois de atualizar o RPM, use **Sair** e reabra o app para carregar a correção.
 
 O ícone usa o padrão de nove pontos da [identidade do Tailscale](https://github.com/tailscale/tailscale/blob/main/client/web/src/assets/icons/tailscale-logo.svg), com uma versão compacta própria para o painel. Esta interface é um projeto independente.
 

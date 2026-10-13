@@ -334,6 +334,22 @@ class GtkTests(unittest.TestCase):
         self.assertFalse(window._on_close(window))
         self.assertTrue(window._closed)
 
+    def test_connection_status_keeps_updating_while_window_is_hidden(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        tray = self.app.tray = Mock(available=True)
+        self.assertTrue(window._on_close(window))
+        timer = window._timer_id
+        for backend, label in (("Stopped", "Desconectado"), ("Running", "Conectado"),
+                               ("Stopped", "Desconectado"), ("Running", "Conectado")):
+            status = dict(STATUS, BackendState=backend)
+            window._apply_status(window._generation, (status, PREFS, ""))
+            tray.update.assert_called_with(label)
+            self.assertFalse(window.get_visible())
+            self.assertEqual(window._timer_id, timer)
+            self.assertFalse(window._closed)
+        self.app.desktop_preferences.minimize_to_tray = False
+
     def test_hidden_window_is_reused_on_activate(self):
         window = self.window()
         self.app.desktop_preferences.minimize_to_tray = True

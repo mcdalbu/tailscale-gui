@@ -302,11 +302,18 @@ class StatusNotifierTray:
         if state == self._state:
             return
         self._state = state
-        self._revision += 1
         if self._objects and not self._stopped:
             self.connection.emit_signal(None, self.ITEM_PATH, "org.kde.StatusNotifierItem", "NewToolTip", None)
-            self.connection.emit_signal(None, self.MENU_PATH, "com.canonical.dbusmenu", "LayoutUpdated",
-                                        GLib.Variant("(ui)", (self._revision, 0)))
+            tooltip = self._item_property(None, None, None, None, "ToolTip")
+            self.connection.emit_signal(
+                None, self.ITEM_PATH, "org.freedesktop.DBus.Properties", "PropertiesChanged",
+                GLib.Variant("(sa{sv}as)", ("org.kde.StatusNotifierItem", {"ToolTip": tooltip}, [])))
+            # O rótulo mudou, mas a estrutura não. O GNOME consulta apenas
+            # type/children-display em LayoutUpdated e mantém os rótulos em cache.
+            # Emitir somente a atualização das propriedades evita esse estado antigo.
+            self.connection.emit_signal(
+                None, self.MENU_PATH, "com.canonical.dbusmenu", "ItemsPropertiesUpdated",
+                GLib.Variant("(a(ia{sv})a(ias))", ([(2, {"label": GLib.Variant("s", state)})], [])))
 
     def stop(self):
         self._stopped = True

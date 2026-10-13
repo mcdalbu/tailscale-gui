@@ -26,7 +26,7 @@ from tailscale_tray import DesktopPreferences, StatusNotifierTray
 
 APP_ID = "io.tailscale.TailscaleGUI"
 APP_NAME = "Tailscale GUI"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 ICON_NAME = "tailscale-gui"
 
 

@@ -75,9 +75,20 @@ class MenuTests(unittest.TestCase):
         self.tray._objects = [1, 2]
         self.tray.update("Conectado")
         self.tray.update("Conectado")
-        self.assertEqual(self.tray.connection.emit_signal.call_count, 2)
+        self.assertEqual(self.tray.connection.emit_signal.call_count, 3)
         tooltip = self.tray._item_property(None, None, None, None, "ToolTip").unpack()
         self.assertEqual(tooltip[3], "Conectado")
+
+    def test_status_change_updates_label_without_invalidating_layout(self):
+        self.tray._objects = [1, 2]
+        revision = self.tray._revision
+        self.tray.update("Conectado")
+        signals = {call.args[3]: call.args[4] for call in self.tray.connection.emit_signal.call_args_list}
+        self.assertIn("ItemsPropertiesUpdated", signals)
+        self.assertNotIn("LayoutUpdated", signals)
+        self.assertEqual(signals["ItemsPropertiesUpdated"].unpack(), ([(2, {"label": "Conectado"})], []))
+        self.assertEqual(self.tray._revision, revision)
+        self.assertEqual(signals["PropertiesChanged"].unpack()[1]["ToolTip"][3], "Conectado")
 
 
 WATCHER_XML = """<node><interface name="org.kde.StatusNotifierWatcher">
@@ -214,6 +225,42 @@ class DBusIntegrationTests(unittest.TestCase):
         result = self.call("/Menu", "com.canonical.dbusmenu", "EventGroup",
                             GLib.Variant("(a(isvu))", ([(99, "clicked", GLib.Variant("s", ""), 0)],)))
         self.assertEqual(result.unpack()[0], [99])
+
+    def test_cached_menu_label_follows_connection_changes(self):
+        # Como o GNOME, o host carrega os rótulos uma vez e depois pede só
+        # type/children-display ao receber alterações da estrutura do menu.
+        cache = {item: props for item, props in self.call(
+            "/Menu", "com.canonical.dbusmenu", "GetGroupProperties",
+            GLib.Variant("(aias)", ([2], ["label"]))).unpack()[0]}
+        updates = []
+
+        def changed(_connection, _sender, _path, _interface, signal, parameters):
+            if signal == "ItemsPropertiesUpdated":
+                properties, _removed = parameters.unpack()
+                for item, props in properties:
+                    cache.setdefault(item, {}).update(props)
+                updates.append(cache[2]["label"])
+
+        subscription = self.reader.signal_subscribe(
+            self.client.get_unique_name(), "com.canonical.dbusmenu", None, "/Menu", None,
+            Gio.DBusSignalFlags.NONE, changed)
+        self.addCleanup(self.reader.signal_unsubscribe, subscription)
+        # Aguarde uma resposta pelo mesmo cliente para garantir que a regra de
+        # assinatura já chegou ao barramento antes da primeira alteração.
+        self.call("/Menu", "com.canonical.dbusmenu", "GetProperty", GLib.Variant("(is)", (2, "label")))
+        for state in ("Desconectado", "Conectado", "Desconectado", "Conectado"):
+            with self.subTest(state=state):
+                count = len(updates)
+                self.tray.update(state)
+                self.pump(lambda: len(updates) > count)
+                self.assertEqual(cache[2]["label"], state)
+                # Uma leitura parcial da estrutura não precisa refazer o rótulo.
+                layout = self.call("/Menu", "com.canonical.dbusmenu", "GetLayout",
+                                   GLib.Variant("(iias)", (0, -1, ["type", "children-display"])))
+                self.assertNotIn("label", layout.unpack()[1][2][1][1])
+                tooltip = self.call("/StatusNotifierItem", "org.freedesktop.DBus.Properties", "Get",
+                                    GLib.Variant("(ss)", ("org.kde.StatusNotifierItem", "ToolTip")))
+                self.assertEqual(tooltip.unpack()[0][3], state)
 
 
 if __name__ == "__main__":
