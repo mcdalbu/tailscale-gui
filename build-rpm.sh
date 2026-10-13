@@ -15,11 +15,12 @@ mkdir -p "$TASK_BUILDDIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS,tmp}
 
 echo "==> Criando tarball do código-fonte..."
 mkdir -p "$TASK_SOURCE_DIR/$NAME-$VERSION"
-cp "$SRCDIR/tailscale-gui.py" "$SRCDIR/tailscale-gui.desktop" \
-   "$SRCDIR/tailscale-gui.png" "$SRCDIR/tailscale-gui.svg" \
+cp "$SRCDIR/tailscale-gui.py" "$SRCDIR/tailscale_tray.py" "$SRCDIR/tailscale-gui.desktop" \
+   "$SRCDIR/tailscale-gui.png" "$SRCDIR/tailscale-gui.svg" "$SRCDIR/tailscale-gui-tray.svg" \
    "$SRCDIR/README.md" "$TASK_SOURCE_DIR/$NAME-$VERSION/"
 mkdir -p "$TASK_SOURCE_DIR/$NAME-$VERSION/tests"
 cp "$SRCDIR"/tests/*.py "$TASK_SOURCE_DIR/$NAME-$VERSION/tests/"
+cp -r "$SRCDIR/icons" "$TASK_SOURCE_DIR/$NAME-$VERSION/"
 
 tar -czf "$TASK_BUILDDIR/SOURCES/$NAME-$VERSION.tar.gz" \
     -C "$TASK_SOURCE_DIR" "$NAME-$VERSION"

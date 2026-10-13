@@ -1,0 +1,11 @@
+[Icon Theme]
+Name=Hicolor
+Comment=Tailscale GUI development icons
+Directories=scalable/apps
+
+[scalable/apps]
+Size=256
+Context=Applications
+Type=Scalable
+MinSize=16
+MaxSize=512

@@ -1,5 +1,5 @@
 Name:           tailscale-gui
-Version:        1.1.0
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Interface gráfica GTK4 para o Tailscale
 
@@ -30,14 +30,17 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_datadir}/applications
 mkdir -p %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
 mkdir -p %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
+mkdir -p %{buildroot}%{_datadir}/tailscale-gui
 
 install -m 755 tailscale-gui.py   %{buildroot}%{_bindir}/tailscale-gui
 install -m 644 tailscale-gui.desktop %{buildroot}%{_datadir}/applications/io.tailscale.TailscaleGUI.desktop
 install -m 644 tailscale-gui.png  %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/tailscale-gui.png
 install -m 644 tailscale-gui.svg  %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/tailscale-gui.svg
+install -m 644 tailscale-gui-tray.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/tailscale-gui-tray.svg
+install -m 644 tailscale_tray.py %{buildroot}%{_datadir}/tailscale-gui/tailscale_tray.py
 
 %check
-python3 -m py_compile tailscale-gui.py
+python3 -m py_compile tailscale-gui.py tailscale_tray.py
 
 %files
 %doc README.md
@@ -45,11 +48,17 @@ python3 -m py_compile tailscale-gui.py
 %{_datadir}/applications/io.tailscale.TailscaleGUI.desktop
 %{_datadir}/icons/hicolor/256x256/apps/tailscale-gui.png
 %{_datadir}/icons/hicolor/scalable/apps/tailscale-gui.svg
+%{_datadir}/icons/hicolor/scalable/apps/tailscale-gui-tray.svg
+%{_datadir}/tailscale-gui/
 
 %post
 gtk-update-icon-cache -f -t %{_datadir}/icons/hicolor &>/dev/null || :
 
 %changelog
+* Tue Oct 13 2026 mcda - 1.2.0-1
+- Opção persistente de minimizar para o tray ao fechar, com menu Abrir e Sair
+- Recuperação da janela quando o suporte ao tray desaparece
+- Ícone com o símbolo de nove pontos do Tailscale
 * Fri Oct 09 2026 mcda - 1.1.0-1
 - Corrige leitura de preferências, operações assíncronas e navegação
 - Adiciona autenticação via navegador e autorização via polkit

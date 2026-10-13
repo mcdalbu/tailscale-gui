@@ -2,7 +2,7 @@
 
 Interface gráfica nativa **GTK4 / libadwaita** para controlar o [Tailscale](https://tailscale.com) no Linux (Fedora).
 
-<img src="tailscale-gui.png" alt="Tailscale GUI: dispositivos conectados e escudo de proteção" width="160">
+<img src="tailscale-gui.png" alt="Tailscale GUI: símbolo de nove pontos do Tailscale" width="160">
 
 ## Funcionalidades
 
@@ -15,6 +15,7 @@ Interface gráfica nativa **GTK4 / libadwaita** para controlar o [Tailscale](htt
 - **Autorização** — diálogo do sistema via `pkexec` quando o daemon exigir privilégios
 - **Log** e notificações de sucesso ou falha, com restauração dos controles após erros
 - **Ícone** vetorial SVG e PNG transparente de 256 × 256 pixels
+- **Tray** — opção de minimizar para a bandeja do sistema ao fechar a janela, com menu para abrir o app e sair
 
 ## Requisitos
 
@@ -30,7 +31,7 @@ Interface gráfica nativa **GTK4 / libadwaita** para controlar o [Tailscale](htt
 Baixe o `.rpm` na [página de releases](../../releases) e instale com:
 
 ```bash
-sudo dnf install ./tailscale-gui-1.1.0-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.0-*.noarch.rpm
 ```
 
 ## Build manual
@@ -45,7 +46,7 @@ cd tailscale-gui
 bash build-rpm.sh
 
 # Instalar
-sudo dnf install ./tailscale-gui-1.1.0-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.0-*.noarch.rpm
 ```
 
 ## Executar sem instalar
@@ -58,6 +59,14 @@ Execute o app como seu usuário habitual. A interface solicita autorização som
 
 As opções são lidas de `tailscale debug prefs`. Se essa consulta falhar, o app informa o erro e desabilita os controles cujos valores não podem ser confirmados. Ao reconectar, `tailscale up` é executado sem flags; alterações individuais usam `tailscale set`, conforme a [documentação do Tailscale](https://tailscale.com/docs/reference/tailscale-cli/up).
 
+## Minimizar para o tray
+
+Em **Configurações → Comportamento do aplicativo**, habilite **Minimizar para o tray ao fechar**. A opção começa desativada e é salva em `~/.config/tailscale-gui/settings.json` (ou no diretório definido por `XDG_CONFIG_HOME`). Quando ativada, fechar a janela mantém o aplicativo e a atualização do status funcionando. Clique no ícone para reabrir a janela ou use **Sair** no menu do tray ou do app; `Ctrl+Q` também encerra o aplicativo.
+
+A integração usa StatusNotifierItem e DBusMenu, sem adicionar dependências GTK3. No KDE Plasma, o suporte já faz parte do painel. No GNOME, é necessário suporte a AppIndicator/KStatusNotifierItem, como a extensão **AppIndicator and KStatusNotifierItem Support**. A opção fica indisponível se não houver um host de tray ativo. Nesse caso, fechar encerra o app normalmente; se o suporte ao tray desaparecer enquanto a janela estiver oculta, ela será reaberta automaticamente.
+
+O ícone usa o padrão de nove pontos da [identidade do Tailscale](https://github.com/tailscale/tailscale/blob/main/client/web/src/assets/icons/tailscale-logo.svg), com uma versão compacta própria para o painel. Esta interface é um projeto independente.
+
 ## Verificação
 
 ```bash
@@ -67,6 +76,14 @@ bash -n build-rpm.sh
 ```
 
 Os testes simulam todas as chamadas ao Tailscale e cobrem falhas, timeouts, autorização, autenticação, leitura de preferências, Exit Nodes com nomes duplicados, navegação e atualizações concorrentes. Os testes GTK exigem um display; sem ele, essa parte da suíte é marcada como ignorada. Para um display isolado, use GTK Broadway ou Xvfb.
+
+Os testes do protocolo de tray usam um painel simulado em um barramento DBus privado:
+
+```bash
+TAILSCALE_GUI_TEST_DBUS=1 dbus-run-session /usr/bin/python3 -m unittest discover -s tests -v
+```
+
+Eles verificam o registro do ícone, o menu, a reabertura, o encerramento, a perda e o retorno do host de tray, além da persistência da preferência. Para incluir também os testes de janela, execute com um display GTK disponível.
 
 ## Licença
 

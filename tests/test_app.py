@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -131,10 +132,14 @@ class GtkTests(unittest.TestCase):
         if gui.Gdk.Display.get_default() is None:
             raise unittest.SkipTest("GTK precisa de um display (real, Xvfb ou Broadway).")
         gui.Adw.init()
-        cls.app = gui.TailscaleApp()
+        cls.settings_dir = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.settings_dir.cleanup)
+        cls.app = gui.TailscaleApp(gui.DesktopPreferences(Path(cls.settings_dir.name) / "settings.json"))
         cls.app.set_application_id("io.tailscale.TailscaleGUI.Tests")
         cls.app.set_flags(gui.Gio.ApplicationFlags.NON_UNIQUE)
-        cls.app.register(None)
+        with patch.object(gui.StatusNotifierTray, "start"):
+            cls.app.register(None)
+        cls.app.tray = None
 
     def settings(self):
         page = gui.SettingsPage()
@@ -143,8 +148,13 @@ class GtkTests(unittest.TestCase):
         return page
 
     def window(self):
+        self.app.desktop_preferences.minimize_to_tray = False
+        self.app.tray = None
+        self.app._held = False
+        self.app._quitting = False
         with patch.object(gui.TailscaleWindow, "_refresh"):
             window = gui.TailscaleWindow(self.app)
+        self.app._window = window
         self.addCleanup(window.destroy)
         self.addCleanup(window._on_close, window)
         return window
@@ -305,6 +315,92 @@ class GtkTests(unittest.TestCase):
         self.assertIsNone(window._timer_id)
         self.assertFalse(window._apply_status(0, (STATUS, PREFS, "")))
         self.assertFalse(window._refresh())
+
+    def test_close_hides_window_and_preserves_timer_when_tray_enabled(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        self.app.tray = Mock(available=True)
+        timer = window._timer_id
+        self.assertTrue(window._on_close(window))
+        self.assertFalse(window.get_visible())
+        self.assertFalse(window._closed)
+        self.assertEqual(window._timer_id, timer)
+        self.app.desktop_preferences.minimize_to_tray = False
+
+    def test_no_tray_host_closes_instead_of_hiding(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        self.app.tray = Mock(available=False)
+        self.assertFalse(window._on_close(window))
+        self.assertTrue(window._closed)
+
+    def test_hidden_window_is_reused_on_activate(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        self.app.tray = Mock(available=True)
+        window._on_close(window)
+        with patch.object(window, "present") as present, patch.object(gui, "TailscaleWindow") as constructor:
+            self.app.do_activate()
+        constructor.assert_not_called()
+        present.assert_called_once()
+        self.app.desktop_preferences.minimize_to_tray = False
+
+    def test_tray_disappearing_restores_hidden_window_and_releases_hold(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        self.app.tray = Mock(available=False)
+        self.app._held = True
+        with patch.object(window, "present") as present, patch.object(self.app, "release") as release:
+            self.app._tray_available_changed(False)
+        present.assert_called_once()
+        release.assert_called_once()
+        self.assertFalse(self.app._held)
+
+    def test_tray_preference_is_saved_and_does_not_modify_tailscale(self):
+        window = self.window()
+        self.app.tray = Mock(available=True)
+        with patch.object(self.app, "hold") as hold, patch.object(gui, "run_change") as change:
+            self.app.set_minimize_to_tray(True)
+        hold.assert_called_once()
+        change.assert_not_called()
+        self.assertTrue(gui.DesktopPreferences(self.app.desktop_preferences.path).minimize_to_tray)
+        self.app._held = False
+        self.app.desktop_preferences.minimize_to_tray = False
+
+    def test_preference_save_failure_restores_switch(self):
+        window = self.window()
+        self.app.tray = Mock(available=True)
+        with patch.object(self.app.desktop_preferences, "save", side_effect=OSError("disco cheio")):
+            self.app.set_minimize_to_tray(True)
+        self.assertFalse(window._settings_page.sw_tray.get_active())
+        self.assertIn("disco cheio", window._settings_page.sw_tray.get_subtitle())
+
+    def test_quit_action_bypasses_minimize_and_cleans_up(self):
+        window = self.window()
+        self.app.desktop_preferences.minimize_to_tray = True
+        tray = self.app.tray = Mock(available=True)
+        with patch.object(self.app, "quit") as quit_app:
+            self.app.quit_app()
+        self.assertTrue(window._closed)
+        self.assertIsNone(self.app._window)
+        tray.stop.assert_called_once()
+        quit_app.assert_called_once()
+
+    def test_desktop_switch_is_independent_of_daemon_availability(self):
+        page = gui.SettingsPage()
+        callback = Mock()
+        page.set_desktop_callback(callback)
+        page.set_desktop_settings(False, True)
+        page.update(None, None, "daemon indisponível")
+        self.assertTrue(page.sw_tray.get_sensitive())
+        page.sw_tray.set_active(True)
+        callback.assert_called_once_with(True)
+
+    def test_local_icon_has_priority_over_previously_installed_versions(self):
+        theme = gui.Gtk.IconTheme.get_for_display(gui.Gdk.Display.get_default())
+        icon = theme.lookup_icon(gui.ICON_NAME, None, 32, 1, gui.Gtk.TextDirection.NONE,
+                                 gui.Gtk.IconLookupFlags.FORCE_REGULAR)
+        self.assertEqual(Path(icon.get_file().get_path()).resolve(), ROOT / "tailscale-gui.svg")
 
 
 if __name__ == "__main__":

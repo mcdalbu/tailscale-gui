@@ -18,9 +18,15 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 
+# O RPM mantém o módulo do tray em /usr/share/tailscale-gui.
+module_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "share", "tailscale-gui")
+if os.path.isdir(module_dir):
+    sys.path.insert(0, module_dir)
+from tailscale_tray import DesktopPreferences, StatusNotifierTray
+
 APP_ID = "io.tailscale.TailscaleGUI"
 APP_NAME = "Tailscale GUI"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 ICON_NAME = "tailscale-gui"
 
 
@@ -496,6 +502,16 @@ class SettingsPage(Gtk.Box):
         opts_group.add(self.sw_shields)
         self.sw_shields.connect("notify::active", self._on_shields_toggled)
 
+        desktop_group = Adw.PreferencesGroup(title="Comportamento do aplicativo")
+        inner.append(desktop_group)
+        self.sw_tray = Adw.SwitchRow(title="Minimizar para o tray ao fechar")
+        self.sw_tray.set_subtitle("Mantém o app na bandeja do sistema; use Sair para encerrá-lo")
+        desktop_group.add(self.sw_tray)
+        self._desktop_cb = None
+        self._block_desktop_signals = False
+        self.sw_tray.set_sensitive(False)
+        self.sw_tray.connect("notify::active", self._on_tray_toggled)
+
         # ── Sobre ──
         about_group = Adw.PreferencesGroup()
         about_group.set_title("Sobre")
@@ -520,6 +536,24 @@ class SettingsPage(Gtk.Box):
 
     def set_command_callback(self, cb):
         self._command_cb = cb
+
+    def set_desktop_callback(self, cb):
+        self._desktop_cb = cb
+
+    def set_desktop_settings(self, enabled, available, error=""):
+        self._block_desktop_signals = True
+        try:
+            self.sw_tray.set_active(enabled)
+            self.sw_tray.set_sensitive(available)
+            subtitle = ("Mantém o app na bandeja do sistema; use Sair para encerrá-lo" if available
+                        else "Tray indisponível nesta sessão. No GNOME, habilite o suporte a AppIndicator")
+            self.sw_tray.set_subtitle(error or subtitle)
+        finally:
+            self._block_desktop_signals = False
+
+    def _on_tray_toggled(self, row, _pspec):
+        if not self._block_desktop_signals and self._desktop_cb:
+            self._desktop_cb(row.get_active())
 
     def _set_busy(self, busy):
         self._busy = busy
@@ -661,6 +695,12 @@ class TailscaleWindow(Adw.ApplicationWindow):
         btn_refresh.connect("clicked", lambda _: self._refresh())
         header.pack_end(btn_refresh)
 
+        app_menu = Gio.Menu()
+        app_menu.append("Sair", "app.quit")
+        menu_button = Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=app_menu)
+        menu_button.set_tooltip_text("Menu do aplicativo")
+        header.pack_end(menu_button)
+
         self._refresh_spinner = Gtk.Spinner()
         header.pack_end(self._refresh_spinner)
 
@@ -717,6 +757,9 @@ class TailscaleWindow(Adw.ApplicationWindow):
 
         self._status_page.set_command_callback(self._run_command)
         self._settings_page.set_command_callback(self._run_command)
+        self._settings_page.set_desktop_callback(app.set_minimize_to_tray)
+        self._settings_page.set_desktop_settings(app.desktop_preferences.minimize_to_tray,
+                                                app.tray is not None and app.tray.available)
 
         self._pages = [
             ("Status", "network-wireless-symbolic", self._status_page),
@@ -801,6 +844,9 @@ class TailscaleWindow(Adw.ApplicationWindow):
             data, prefs, error = snapshot
             self._snapshot = snapshot
             self._status_page.update(data, error)
+            app = self.get_application()
+            if app.tray is not None:
+                app.tray.update(self._status_page.state_badge.get_text())
             self._peers_page.update(data)
             self._settings_page.update(data, prefs, error, force=self._reset_exit_selection)
             self._reset_exit_selection = False
@@ -862,11 +908,20 @@ class TailscaleWindow(Adw.ApplicationWindow):
         return False
 
     def _on_close(self, _window):
+        app = self.get_application()
+        if app is not None and app.can_minimize_to_tray():
+            self.set_visible(False)
+            return True
+        self._dispose()
+        if app is not None and app._window is self:
+            app._window = None
+        return False
+
+    def _dispose(self):
         self._closed = True
         if self._timer_id:
             GLib.source_remove(self._timer_id)
             self._timer_id = None
-        return False
 
 
 # ───────────────────────────── CSS ──────────────────────────────────
@@ -912,23 +967,67 @@ CSS = """
 # ──────────────────────────── Application ───────────────────────────
 
 class TailscaleApp(Adw.Application):
-    def __init__(self):
+    def __init__(self, desktop_preferences=None):
         super().__init__(application_id=APP_ID,
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        self.desktop_preferences = desktop_preferences or DesktopPreferences()
+        self.tray = None
+        self._window = None
+        self._held = False
+        self._quitting = False
 
     def do_activate(self):
-        win = self.get_active_window()
-        if not win:
-            win = TailscaleWindow(self)
-            # Carregar CSS
-            provider = Gtk.CssProvider()
-            provider.load_from_string(CSS)
-            Gtk.StyleContext.add_provider_for_display(
-                Gdk.Display.get_default(),
-                provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            )
-        win.present()
+        if self._window is None:
+            self._window = TailscaleWindow(self)
+        self._window.present()
+
+    def can_minimize_to_tray(self):
+        return (not self._quitting and self.desktop_preferences.minimize_to_tray
+                and self.tray is not None and self.tray.available)
+
+    def _sync_hold(self):
+        hold = bool(self.can_minimize_to_tray())
+        if hold and not self._held:
+            self.hold()
+            self._held = True
+        elif not hold and self._held:
+            self.release()
+            self._held = False
+
+    def _tray_available_changed(self, available):
+        if self._quitting:
+            return
+        # Reabre a janela se o painel desaparecer enquanto o app estiver oculto.
+        if not available and self._window is not None and not self._window.get_visible():
+            self._window.present()
+        self._sync_hold()
+        if self._window is not None:
+            self._window._settings_page.set_desktop_settings(self.desktop_preferences.minimize_to_tray, available)
+
+    def set_minimize_to_tray(self, enabled):
+        try:
+            self.desktop_preferences.save(enabled)
+            error = ""
+        except OSError as exc:
+            error = f"Não foi possível salvar a preferência: {exc}"
+        if self._window is not None:
+            self._window._settings_page.set_desktop_settings(
+                self.desktop_preferences.minimize_to_tray,
+                self.tray is not None and self.tray.available, error)
+            if not self.can_minimize_to_tray() and not self._window.get_visible():
+                self._window.present()
+        self._sync_hold()
+
+    def quit_app(self):
+        self._quitting = True
+        if self._window is not None:
+            self._window._dispose()
+            self._window.destroy()
+            self._window = None
+        if self.tray is not None:
+            self.tray.stop()
+        self._sync_hold()
+        self.quit()
 
     def do_startup(self):
         Adw.Application.do_startup(self)
@@ -937,7 +1036,31 @@ class TailscaleApp(Adw.Application):
         # Permite usar o ícone do projeto ao executar sem instalar.
         icon_dir = os.path.dirname(os.path.realpath(__file__))
         if os.path.isfile(os.path.join(icon_dir, ICON_NAME + ".svg")):
-            theme.add_search_path(icon_dir)
+            # O ícone do código em execução tem prioridade sobre versões instaladas.
+            theme_dir = os.path.join(icon_dir, "icons")
+            theme.set_search_path([theme_dir] + [path for path in theme.get_search_path() if path != theme_dir])
+        else:
+            icon_dir = "/usr/share/icons/hicolor/scalable/apps"
+        provider = Gtk.CssProvider()
+        provider.load_from_string(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider,
+                                                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", lambda *_: self.quit_app())
+        self.add_action(quit_action)
+        self.set_accels_for_action("app.quit", ["<Control>q"])
+        self.tray = StatusNotifierTray(self.get_dbus_connection(), self.activate, self.quit_app,
+                                       self._tray_available_changed, icon_dir)
+        self.tray.start()
+
+    def do_shutdown(self):
+        self._quitting = True
+        if self._window is not None:
+            self._window._dispose()
+        if self.tray is not None:
+            self.tray.stop()
+        self._sync_hold()
+        Adw.Application.do_shutdown(self)
 
 
 def main():
