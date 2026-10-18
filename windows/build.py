@@ -29,6 +29,9 @@ def main():
     with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.write(executable, "TailscaleGUI.exe")
         archive.write(ROOT / "windows" / "README.md", "LEIA-ME.md")
+        for license_file in (ROOT / "windows" / "licenses").iterdir():
+            if license_file.is_file():
+                archive.write(license_file, "licenses/" + license_file.name)
         for name in ("PySide6-Essentials", "shiboken6", "PyInstaller"):
             distribution = importlib.metadata.distribution(name)
             for entry in distribution.files or []:
