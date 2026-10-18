@@ -1,6 +1,10 @@
 # Build artifacts
 *.rpm
 rpmbuild/
+dist/
+build/
+.venv-windows/
+*.exe
 
 # Python cache
 __pycache__/

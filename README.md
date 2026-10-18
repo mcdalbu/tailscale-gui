@@ -1,8 +1,16 @@
 # Tailscale GUI
 
-Interface gráfica nativa **GTK4 / libadwaita** para controlar o [Tailscale](https://tailscale.com) no Linux (Fedora).
+Interface gráfica independente para controlar o [Tailscale](https://tailscale.com): **GTK4/libadwaita no Linux** e **Qt no Windows**.
 
 <img src="tailscale-gui.png" alt="Tailscale GUI: símbolo de nove pontos do Tailscale" width="160">
+
+## Windows
+
+A [versão Windows](windows/README.md) oferece um executável portátil para Windows 10/11 x64, com tray nativo, status, dispositivos, Exit Node, Accept Routes e Shields Up. O Python está incluído no executável; apenas o cliente oficial Tailscale precisa estar instalado.
+
+Os pacotes ZIP são gerados pelo workflow **Windows**, em **Actions → Windows → execução concluída → Artifacts → TailscaleGUI-Windows-x64**. Extraia o ZIP e abra `TailscaleGUI.exe`. Os detalhes de uso e compilação estão em [windows/README.md](windows/README.md).
+
+As instruções abaixo se referem à versão Linux.
 
 ## Funcionalidades
 
