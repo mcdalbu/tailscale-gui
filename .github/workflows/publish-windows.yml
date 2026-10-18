@@ -1,0 +1,73 @@
+name: Publicar Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Execução Windows concluída com sucesso na main
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - name: Validar a origem e baixar o pacote já testado
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID" > run.json
+          jq -e '.conclusion == "success" and .head_branch == "main" and .event == "push" and .path == ".github/workflows/windows.yml" and .head_repository.full_name == env.GH_REPO' run.json
+          gh run download "$BUILD_RUN_ID" --repo "$GH_REPO" --name TailscaleGUI-Windows-x64 --dir package
+      - name: Conferir integridade e formato Windows x64
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, struct, zipfile
+          from pathlib import Path
+          package = Path('package/TailscaleGUI-Windows-x64-1.3.0.zip')
+          expected = package.with_suffix('.zip.sha256').read_text().split()[0]
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == expected
+          with zipfile.ZipFile(package) as archive:
+              assert archive.testzip() is None
+              required = {'TailscaleGUI.exe', 'LEIA-ME.md', 'licenses/LGPL-3.0-only.txt', 'licenses/GPL-3.0-only.txt', 'licenses/NOTICES.md'}
+              assert required <= set(archive.namelist())
+              exe = archive.read('TailscaleGUI.exe')
+              assert exe[:2] == b'MZ'
+              offset = struct.unpack_from('<I', exe, 0x3c)[0]
+              assert exe[offset:offset+4] == b'PE\0\0'
+              assert struct.unpack_from('<H', exe, offset+4)[0] == 0x8664
+              assert struct.unpack_from('<H', exe, offset+24+68)[0] == 2
+          print('ZIP, SHA-256 e executável gráfico Windows x64 conferidos.')
+          PY
+      - name: Publicar release Windows 1.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'EOF'
+          Versão portátil para Windows 10/11 x64, com interface Qt e tray nativo. Não exige Python instalado; o cliente oficial Tailscale continua sendo necessário.
+
+          Conectar/desconectar preservando preferências, status e dispositivos, Exit Node por IP, Accept Routes, Shields Up, autenticação pelo navegador e opção de minimizar para o tray ao fechar.
+
+          Validação: 41 testes automatizados executados em Windows, compilação com PyInstaller e abertura do executável final com o plugin nativo do Windows e dados simulados. O runner não foi conectado a um Tailnet real.
+
+          Extraia o ZIP e execute TailscaleGUI.exe. Instruções, avisos de licença e SHA-256 estão incluídos. O executável não é assinado digitalmente.
+          EOF
+          BUILD_SHA=$(jq -r .head_sha run.json)
+          gh release create windows-v1.3.0 --repo "$GH_REPO" --target "$BUILD_SHA" --title "Tailscale GUI para Windows 1.3.0" --notes-file notes.md --draft package/*
+          gh release edit windows-v1.3.0 --repo "$GH_REPO" --draft=false

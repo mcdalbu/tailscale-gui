@@ -8,7 +8,9 @@ Interface gráfica independente para controlar o [Tailscale](https://tailscale.c
 
 A [versão Windows](windows/README.md) oferece um executável portátil para Windows 10/11 x64, com tray nativo, status, dispositivos, Exit Node, Accept Routes e Shields Up. O Python está incluído no executável; apenas o cliente oficial Tailscale precisa estar instalado.
 
-Os pacotes ZIP são gerados pelo workflow **Windows**, em **Actions → Windows → execução concluída → Artifacts → TailscaleGUI-Windows-x64**. Extraia o ZIP e abra `TailscaleGUI.exe`. Os detalhes de uso e compilação estão em [windows/README.md](windows/README.md).
+Baixe o ZIP na [release Windows 1.3.0](https://github.com/mcdalbu/tailscale-gui/releases/tag/windows-v1.3.0), extraia o pacote e abra `TailscaleGUI.exe`. Os detalhes de uso e compilação estão em [windows/README.md](windows/README.md).
+
+Novos builds também são gerados pelo workflow **Windows**, em **Actions → Windows → execução concluída → Artifacts → TailscaleGUI-Windows-x64**.
 
 As instruções abaixo se referem à versão Linux.
 
@@ -36,7 +38,7 @@ As instruções abaixo se referem à versão Linux.
 
 ## Instalação via RPM
 
-Baixe o `.rpm` na [página de releases](../../releases) e instale com:
+Gere o `.rpm` com `bash build-rpm.sh` (instruções abaixo) e instale com:
 
 ```bash
 sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
