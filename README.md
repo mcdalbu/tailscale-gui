@@ -38,7 +38,7 @@ As instruções abaixo se referem à versão Linux.
 
 ## Instalação via RPM
 
-Gere o `.rpm` com `bash build-rpm.sh` (instruções abaixo) e instale com:
+Baixe o `.rpm` na [release Linux 1.2.1](https://github.com/mcdalbu/tailscale-gui/releases/tag/linux-v1.2.1), ou gere o pacote com `bash build-rpm.sh` (instruções abaixo), e instale com:
 
 ```bash
 sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
