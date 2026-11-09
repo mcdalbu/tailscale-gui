@@ -236,6 +236,35 @@ class GtkTests(unittest.TestCase):
         page._on_up(None)
         command.assert_called_once_with("up")
 
+    def test_tray_commands_follow_status_and_busy_state_while_hidden(self):
+        window = self.window()
+        tray = self.app.tray = Mock(available=True)
+        with patch.object(gui.threading, "Thread") as worker:
+            for backend, command, enabled in (("Stopped", "up", (True, False)),
+                                              ("Running", "down", (False, True))):
+                with self.subTest(backend=backend):
+                    window._command_running = False
+                    window._apply_status(window._generation, (dict(STATUS, BackendState=backend), PREFS, ""))
+                    tray.set_controls.assert_called_with(*enabled)
+                    window.set_visible(False)
+                    self.app._tray_command(command)
+                    self.assertEqual(worker.call_args.kwargs["args"], ((command,),))
+                    tray.set_controls.assert_called_with(False, False)
+                    count = worker.call_count
+                    self.app._tray_command(command)
+                    self.assertEqual(worker.call_count, count)
+                    self.assertFalse(window.get_visible())
+
+    def test_tray_commands_are_disabled_when_status_is_unavailable(self):
+        window = self.window()
+        tray = self.app.tray = Mock(available=True)
+        window._apply_status(window._generation, (None, None, "daemon indisponível"))
+        tray.set_controls.assert_called_with(False, False)
+        with patch.object(window, "_run_command") as command:
+            self.app._tray_command("up")
+            self.app._tray_command("down")
+        command.assert_not_called()
+
     def test_status_error_clears_stale_details_and_disables_commands(self):
         page = gui.StatusPage()
         page.update(STATUS)

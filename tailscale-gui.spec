@@ -1,5 +1,5 @@
 Name:           tailscale-gui
-Version:        1.2.1
+Version:        1.2.2
 Release:        1%{?dist}
 Summary:        Interface gráfica GTK4 para o Tailscale
 
@@ -55,6 +55,10 @@ python3 -m py_compile tailscale-gui.py tailscale_tray.py
 gtk-update-icon-cache -f -t %{_datadir}/icons/hicolor &>/dev/null || :
 
 %changelog
+* Mon Nov 09 2026 mcda - 1.2.2-1
+- Adiciona Conectar e Desconectar ao menu do tray
+- Sincroniza as ações com o estado da conexão e bloqueia cliques durante operações
+- Testa comandos com janela oculta e status indisponível
 * Tue Oct 13 2026 mcda - 1.2.1-1
 - Corrige status antigo no menu do tray usando ItemsPropertiesUpdated
 - Sincroniza o tooltip com PropertiesChanged e NewToolTip

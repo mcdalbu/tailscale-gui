@@ -90,12 +90,14 @@ class StatusNotifierTray:
     ITEM_PATH = "/StatusNotifierItem"
     MENU_PATH = "/Menu"
 
-    def __init__(self, connection, show_window, quit_app, availability_changed, icon_dir):
+    def __init__(self, connection, show_window, quit_app, availability_changed, icon_dir, command=None):
         self.connection = connection
         self.show_window = show_window
         self.quit_app = quit_app
         self.availability_changed = availability_changed
         self.icon_dir = icon_dir
+        self.command = command
+        self._can_up = self._can_down = False
         self.available = False
         self._stopped = False
         self._generation = 0
@@ -240,6 +242,9 @@ class StatusNotifierTray:
             2: props(label=self._state, enabled=False, visible=True),
             3: props(type="separator", visible=True),
             4: props(label="Sair", enabled=True, visible=True),
+            5: props(label="Conectar", enabled=self._can_up, visible=True),
+            6: props(label="Desconectar", enabled=self._can_down, visible=True),
+            7: props(type="separator", visible=True),
         }
 
     def _layout(self, parent, depth, names):
@@ -249,7 +254,7 @@ class StatusNotifierTray:
             properties = {key: value for key, value in properties.items() if key in names}
         children = []
         if parent == 0 and depth != 0:
-            children = [GLib.Variant("(ia{sv}av)", self._layout(item, 0, names)) for item in (1, 2, 3, 4)]
+            children = [GLib.Variant("(ia{sv}av)", self._layout(item, 0, names)) for item in (1, 2, 3, 5, 6, 7, 4)]
         return parent, properties, children
 
     def _menu_property(self, _connection, _sender, _path, _interface, name):
@@ -262,7 +267,27 @@ class StatusNotifierTray:
             return False
         if event == "clicked" and item in (1, 4):
             GLib.idle_add(self._invoke, self.show_window if item == 1 else self.quit_app)
+        elif event == "clicked" and item in (5, 6):
+            GLib.idle_add(self._connection_event, item)
         return True
+
+    def _connection_event(self, item):
+        # Revalide ao executar: outro clique pode ter iniciado uma operação.
+        if not self._stopped and self.command and (self._can_up if item == 5 else self._can_down):
+            self.command("up" if item == 5 else "down")
+        return False
+
+    def set_controls(self, can_up, can_down):
+        can_up, can_down = bool(can_up and self.command), bool(can_down and self.command)
+        if (can_up, can_down) == (self._can_up, self._can_down):
+            return
+        self._can_up, self._can_down = can_up, can_down
+        if self._objects and not self._stopped:
+            updates = [(5, {"enabled": GLib.Variant("b", can_up)}),
+                       (6, {"enabled": GLib.Variant("b", can_down)})]
+            self.connection.emit_signal(
+                None, self.MENU_PATH, "com.canonical.dbusmenu", "ItemsPropertiesUpdated",
+                GLib.Variant("(a(ia{sv})a(ias))", (updates, [])))
 
     def _menu_method(self, _connection, _sender, _path, _interface, method, parameters, invocation):
         args = parameters.unpack()

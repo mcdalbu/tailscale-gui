@@ -53,7 +53,7 @@ class MenuTests(unittest.TestCase):
         Gio.DBusNodeInfo.new_for_xml(ITEM_XML)
         Gio.DBusNodeInfo.new_for_xml(MENU_XML)
         layout = GLib.Variant("(u(ia{sv}av))", (1, self.tray._layout(0, -1, []))).unpack()
-        self.assertEqual([child[0] for child in layout[1][2]], [1, 2, 3, 4])
+        self.assertEqual([child[0] for child in layout[1][2]], [1, 2, 3, 5, 6, 7, 4])
         self.assertEqual(layout[1][2][-1][1]["label"], "Sair")
 
     def test_layout_depth_and_property_filter(self):
@@ -70,6 +70,40 @@ class MenuTests(unittest.TestCase):
         self.assertFalse(self.tray._event(99, "clicked"))
         self.assertTrue(self.tray._event(2, "clicked"))
         self.tray.show_window.assert_not_called()
+
+    def test_connection_actions_recheck_enabled_state_when_dispatched(self):
+        command = self.tray.command = Mock()
+        self.tray.set_controls(True, False)
+        with patch("tailscale_tray.GLib.idle_add") as idle:
+            self.tray._event(5, "clicked")
+        callback, item = idle.call_args.args
+        self.tray.set_controls(False, False)
+        callback(item)
+        command.assert_not_called()
+        self.tray.set_controls(True, False)
+        callback(item)
+        command.assert_called_once_with("up")
+        command.reset_mock()
+        self.tray.set_controls(False, True)
+        self.tray._connection_event(6)
+        command.assert_called_once_with("down")
+        command.reset_mock()
+        self.tray._stopped = True
+        self.tray._connection_event(6)
+        command.assert_not_called()
+
+    def test_controls_publish_enabled_properties_without_duplicate_signals(self):
+        self.tray.command = Mock()
+        self.tray._objects = [1, 2]
+        self.tray.set_controls(True, False)
+        self.tray.set_controls(True, False)
+        self.tray.connection.emit_signal.assert_called_once()
+        signal = self.tray.connection.emit_signal.call_args.args
+        self.assertEqual(signal[3], "ItemsPropertiesUpdated")
+        self.assertEqual(signal[4].unpack(),
+                         ([(5, {"enabled": True}), (6, {"enabled": False})], []))
+        self.assertTrue(self.tray._menu_items()[5]["enabled"].unpack())
+        self.assertFalse(self.tray._menu_items()[6]["enabled"].unpack())
 
     def test_status_updates_do_not_duplicate_notifications(self):
         self.tray._objects = [1, 2]

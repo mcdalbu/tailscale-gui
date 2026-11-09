@@ -26,7 +26,7 @@ from tailscale_tray import DesktopPreferences, StatusNotifierTray
 
 APP_ID = "io.tailscale.TailscaleGUI"
 APP_NAME = "Tailscale GUI"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 ICON_NAME = "tailscale-gui"
 
 
@@ -863,6 +863,10 @@ class TailscaleWindow(Adw.ApplicationWindow):
         self._busy = busy
         self._status_page._set_busy(busy)
         self._settings_page._set_busy(busy)
+        tray = self.get_application().tray
+        if tray is not None:
+            tray.set_controls(self._status_page.btn_up.get_sensitive(),
+                              self._status_page.btn_down.get_sensitive())
 
     def _run_command(self, *args):
         if self._busy or self._closed:
@@ -985,6 +989,14 @@ class TailscaleApp(Adw.Application):
         return (not self._quitting and self.desktop_preferences.minimize_to_tray
                 and self.tray is not None and self.tray.available)
 
+    def _tray_command(self, command):
+        window = self._window
+        if self._quitting or window is None or window._closed:
+            return
+        button = {"up": window._status_page.btn_up, "down": window._status_page.btn_down}.get(command)
+        if button is not None and button.get_sensitive():
+            window._run_command(command)
+
     def _sync_hold(self):
         hold = bool(self.can_minimize_to_tray())
         if hold and not self._held:
@@ -1050,7 +1062,7 @@ class TailscaleApp(Adw.Application):
         self.add_action(quit_action)
         self.set_accels_for_action("app.quit", ["<Control>q"])
         self.tray = StatusNotifierTray(self.get_dbus_connection(), self.activate, self.quit_app,
-                                       self._tray_available_changed, icon_dir)
+                                       self._tray_available_changed, icon_dir, self._tray_command)
         self.tray.start()
 
     def do_shutdown(self):

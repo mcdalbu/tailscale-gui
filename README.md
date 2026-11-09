@@ -25,7 +25,7 @@ As instruções abaixo se referem à versão Linux.
 - **Autorização** — diálogo do sistema via `pkexec` quando o daemon exigir privilégios
 - **Log** e notificações de sucesso ou falha, com restauração dos controles após erros
 - **Ícone** vetorial SVG e PNG transparente de 256 × 256 pixels
-- **Tray** — opção de minimizar para a bandeja do sistema ao fechar a janela, com menu para abrir o app e sair
+- **Tray** — opção de minimizar para a bandeja do sistema ao fechar a janela, com menu para conectar, desconectar, abrir o app e sair
 
 ## Requisitos
 
@@ -38,10 +38,10 @@ As instruções abaixo se referem à versão Linux.
 
 ## Instalação via RPM
 
-Baixe o `.rpm` na [release Linux 1.2.1](https://github.com/mcdalbu/tailscale-gui/releases/tag/linux-v1.2.1), ou gere o pacote com `bash build-rpm.sh` (instruções abaixo), e instale com:
+Baixe o `.rpm` na [release Linux 1.2.2](https://github.com/mcdalbu/tailscale-gui/releases/tag/linux-v1.2.2), ou gere o pacote com `bash build-rpm.sh` (instruções abaixo), e instale com:
 
 ```bash
-sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.2-*.noarch.rpm
 ```
 
 ## Build manual
@@ -56,7 +56,7 @@ cd tailscale-gui
 bash build-rpm.sh
 
 # Instalar
-sudo dnf install ./tailscale-gui-1.2.1-*.noarch.rpm
+sudo dnf install ./tailscale-gui-1.2.2-*.noarch.rpm
 ```
 
 ## Executar sem instalar
@@ -70,6 +70,8 @@ Execute o app como seu usuário habitual. A interface solicita autorização som
 As opções são lidas de `tailscale debug prefs`. Se essa consulta falhar, o app informa o erro e desabilita os controles cujos valores não podem ser confirmados. Ao reconectar, `tailscale up` é executado sem flags; alterações individuais usam `tailscale set`, conforme a [documentação do Tailscale](https://tailscale.com/docs/reference/tailscale-cli/up).
 
 ## Minimizar para o tray
+
+O menu do tray também permite **Conectar** e **Desconectar** sem abrir a janela. As ações acompanham o estado do Tailscale e ficam desabilitadas enquanto uma operação está em andamento ou o status está indisponível.
 
 Em **Configurações → Comportamento do aplicativo**, habilite **Minimizar para o tray ao fechar**. A opção começa desativada e é salva em `~/.config/tailscale-gui/settings.json` (ou no diretório definido por `XDG_CONFIG_HOME`). Quando ativada, fechar a janela mantém o aplicativo e a atualização do status funcionando. Clique no ícone para reabrir a janela ou use **Sair** no menu do tray ou do app; `Ctrl+Q` também encerra o aplicativo.
 
